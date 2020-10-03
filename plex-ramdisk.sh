@@ -106,7 +106,7 @@ if [ -f "$PLEXDBLOC/THIS_IS_A_RAMDISK" ]; then
 fi
 
 stop_docker $DOCKER_NAME 60
-rsync -a --progress -h "$PLEXDBLOC/" "$RAMDISKDIR/"
+rsync -a --progress -h --exclude '*.db-20*' "$PLEXDBLOC/" "$RAMDISKDIR/"
 if [ "$?" != "0" ]; then
    echo rsync failed. Exiting
    FailExit
@@ -156,7 +156,7 @@ if [ "$?" == "0" ]; then
    FailExit
 fi
 
-rsync -a --progress -h --exclude THIS_IS_A_RAMDISK "$RAMDISKDIR/" "$PLEXDBLOC/"
+rsync -a --progress -h --exclude THIS_IS_A_RAMDISK --exclude '*.db-20*' "$RAMDISKDIR/" "$PLEXDBLOC/"
 
 start_docker $DOCKER_NAME
 
