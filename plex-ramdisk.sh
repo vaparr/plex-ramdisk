@@ -23,6 +23,18 @@ exit 1
 }
 
 
+function is_dockerd_running(){
+
+local STATUS = $(/etc/rc.d/rc.docker status 2>/dev/null | head -1 | grep running)
+
+if [ "$STATUS" != "" ]; then
+   return "true"
+else
+   return "false"
+fi
+
+}
+
 function LogInfo() {
     echo "$@"
 }
@@ -41,6 +53,9 @@ function LogError() {
 
 
 function stop_docker() {
+
+    [[ is_dockerd_running == "false" ]] && LogWarning "Docker is not running." && return
+
     local op="[DOCKER STOP]"
     local stop_seconds=$SECONDS
     LogInfo $op: STOPPING $1 with timeout: $2
@@ -66,6 +81,8 @@ function stop_docker() {
 }
 
 function start_docker() {
+    [[ is_dockerd_running == "false" ]] && LogWarning "Docker is not running." && return
+
     local op="[DOCKER START]"
     local start_seconds=$SECONDS
     LogInfo $op: STARTING $1
