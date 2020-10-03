@@ -2,7 +2,7 @@ RAMDISKDIR=/dev/shm/plex_db_ramdisk
 
 DOCKER_NAME=plex
 
-PLEXDBLOC="/mnt/user/appdata/$DOCKER_NAME/Library/Application Support/Plex Media Server/Plug-in Support/Databases/"
+PLEXDBLOC="/mnt/cache/appdata/$DOCKER_NAME/Library/Application Support/Plex Media Server/Plug-in Support/Databases/"
 dry_run=0
 
 
@@ -129,6 +129,18 @@ if [ "$?" != "0" ]; then
    FailExit
 fi
 
+echo find $RAMDISKDIR -type f -name '*.db'
+for db in $(find $RAMDISKDIR -type f -name '*.db')
+do
+  ValidateDb $db
+  if [ "$?" != "0" ]; then
+     echo DB is Corrupt
+     FailExit
+  fi
+
+done
+
+
 mount --bind "$RAMDISKDIR" "$PLEXDBLOC"
 if [ "$?" != "0" ]; then
    echo mount failed. Exiting
@@ -172,6 +184,15 @@ if [ "$?" == "0" ]; then
    echo $PLEXDBLOC is still a  mountpoint after unmounting. Something went wrong.
    FailExit
 fi
+echo find $RAMDISKDIR -type f -name '*.db'
+for db in $(find $RAMDISKDIR -type f -name '*.db')
+do
+  ValidateDb $db
+  if [ "$?" != "0" ]; then
+     echo DB is Corrupt
+     FailExit
+  fi
+done
 
 rsync -a --progress -h --exclude THIS_IS_A_RAMDISK --exclude '*.db-20*' "$RAMDISKDIR/" "$PLEXDBLOC/"
 
@@ -180,6 +201,24 @@ start_docker $DOCKER_NAME
 
 }
 
+
+function ValidateDb() {
+sync
+echo -n Checking DB $1 ...
+cp $1 $1.old
+sqlite3 $1.old "DROP index 'index_title_sort_naturalsort'" > /dev/null 2>&1
+sqlite3 $1.old "DELETE from schema_migrations where version='20180501000000'" > /dev/null 2>&1
+local check=$(sqlite3 $1.old "PRAGMA integrity_check")
+rm $1.old
+if [[ "$check" == "ok" ]]; then
+   echo PASS
+   return 0
+else
+   echo FAIL
+   return 1
+fi
+
+}
 
 
 TEMP=`getopt -o ?h --long start,stop,help  -n 'plex-ramdisk' -- "$@"`
