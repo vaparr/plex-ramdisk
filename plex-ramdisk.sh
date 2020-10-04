@@ -61,12 +61,12 @@ exit 1
 
 function is_dockerd_running(){
 
-local STATUS = $(/etc/rc.d/rc.docker status 2>/dev/null | head -1 | grep running)
+local STATUS=$(/etc/rc.d/rc.docker status 2>/dev/null | head -1 | grep running)
 
 if [ "$STATUS" != "" ]; then
-   return "true"
+   echo "true"
 else
-   return "false"
+   echo "false"
 fi
 
 }
@@ -254,7 +254,7 @@ start_docker $DOCKER_NAME
 function ValidateDb() {
 sync
 echo -n Checking DB $1 ...
-echo cp "$1" "$1.old"
+#echo cp "$1" "$1.old"
 cp "$1" "$1.old"
 sqlite3 "$1.old" "DROP index 'index_title_sort_naturalsort'" > /dev/null 2>&1
 sqlite3 "$1.old" "DELETE from schema_migrations where version='20180501000000'" > /dev/null 2>&1
