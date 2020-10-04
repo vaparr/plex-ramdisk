@@ -20,6 +20,7 @@ function Help(){
     echo "--estop  :  Emergency Stop.  Stops docker, and unmounts ramdisk, but does not copy any files."
     echo "--validate [DIR] : Validates the files in this dir are valid"
     echo "--copyback : Stops Plex, Stops the ramdisk, validates db, copies the DB back to disk, restarts"
+    echo "--status: Displays current status"
     exit 1
 }
 
@@ -115,6 +116,7 @@ function is_docker_running() {
 
     local RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
     LogVerbose $1 is Running: $RUNNING
+    echo $RUNNING
     if [[ "$RUNNING" == "true" ]]; then
         return "0"
     fi
@@ -315,6 +317,35 @@ Start
 }
 
 
+function Status() {
+echo ------------- DOCKER STATUS --------------
+echo dockerd Service Running: $(is_dockerd_running)
+echo $DOCKER_NAME container:  $(is_docker_running $DOCKER_NAME)
+echo
+
+echo ------------- DOCKER CONFIG --------------
+CheckBindsForShm
+echo db location: $PLEXDBLOC
+echo
+echo --------------- PLEX ---------------------
+IsPlexPlaying
+echo
+echo -------------- RAMDISK -------------------
+echo Ramdisk Location: $RAMDISKDIR
+mountpoint "$PLEXDBLOC"
+if [ "$?" != "0" ]; then
+   echo "Ramdisk is currently not mounted"
+else
+   echo "Ramdisk is active:"
+   echo "$RAMDISKDIR is currently mounted at $PLEXDBLOC"
+fi
+echo Size:
+du -h -d1 $RAMDISKDIR
+
+exit 0
+
+}
+
 
 function ValidateDb() {
 sync
@@ -365,7 +396,7 @@ return $error
 
 }
 
-TEMP=`getopt -o h --long start,stop,estop,validate:,copyback,help  -n 'plex-ramdisk' -- "$@"`
+TEMP=`getopt -o h --long status,start,stop,estop,validate:,copyback,help  -n 'plex-ramdisk' -- "$@"`
 
 if [ $? != 0 ] ; then Help ; fi
 
@@ -374,6 +405,7 @@ START=0
 STOP=0
 ESTOP=0
 COPYBACK=0
+STATUS=0
 VALIDATE=""
 while true ; do
     case "$1" in
@@ -397,6 +429,10 @@ while true ; do
             COPYBACK=1
             shift
             ;;
+        "--status")
+            STATUS=1
+            shift
+            ;;
         -h|"--help") 
             Help 
             break
@@ -405,8 +441,8 @@ while true ; do
         *) break ;;
     esac
 done
-echo "Remaining arguments:"
-for arg do echo '--> '"\`$arg'" ; done
+#echo "Remaining arguments:"
+#for arg do echo '--> '"\`$arg'" ; done
 
 
 
@@ -430,6 +466,9 @@ if [[ "$ESTOP" == "1" ]]; then
 fi
 if [[ "$START" == "1" ]]; then
     Start
+fi
+if [[ "$STATUS" == "1" ]]; then
+    Status
 fi
 
 
