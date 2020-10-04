@@ -2,6 +2,12 @@ RAMDISKDIR=/dev/shm/plex_db_ramdisk
 
 DOCKER_NAME=plex
 
+PLEXLOC=http://192.168.1.62:32400
+PLEXTOKEN=NONE
+
+# curl -s http://192.168.1.62:32400/livetv/sessions?X-Plex-Token=FAKEKEY | xmllint --xpath 'string(//MediaContainer/@size)' -
+# curl -s http://192.168.1.62:32400/status/sessions?X-Plex-Token=FAKEKEY | xmllint --xpath 'string(//MediaContainer/@size)' -
+
 PLEXDBLOC="/mnt/cache/appdata/$DOCKER_NAME/Library/Application Support/Plex Media Server/Plug-in Support/Databases/"
 dry_run=0
 is_user_script=1
@@ -13,9 +19,26 @@ function Help(){
     echo "--stop   :  Stops the ramdisk"
     echo "--estop  :  Emergency Stop.  Stops docker, and unmounts ramdisk, but does not copy any files."
     echo "--validate [DIR] : Validates the files in this dir are valid"
+    echo "--copyback : Stops Plex, Stops the ramdisk, validates db, copies the DB back to disk, restarts"
     exit 1
 }
 
+
+function IsPlexPlaying() {
+
+local sessions=$(curl -s $PLEXLOC/status/sessions?X-Plex-Token=$PLEXTOKEN | xmllint --xpath 'string(//MediaContainer/@size)' - 2>/dev/null)
+local livesessions=$(curl -s $PLEXLOC/livetv/sessions?X-Plex-Token=$PLEXTOKEN | xmllint --xpath 'string(//MediaContainer/@size)' - 2>/dev/null)
+
+echo "Plex has $sessions active streams and $livesessions Live TV streams"
+
+if [[ "$sessions" == "0" || "$sessions" == "" ]]; then
+   if [[ "$livesessions" == "0" || "$livesessions" == "" ]]; then
+      return "0"
+   fi
+fi
+return "1"
+
+}
 
 
 function CheckBindsForShm() {
@@ -211,7 +234,6 @@ fi
 }
 
 function Stop() {
-
 mountpoint "$PLEXDBLOC"
 
 if [ "$?" != "0" ]; then
@@ -249,6 +271,49 @@ start_docker $DOCKER_NAME
 
 
 }
+
+function CopyBack {
+
+IsPlexPlaying
+
+if [[ "$?" == "0" ]]; then
+   echo Plex is not playing
+else
+   echo Plex is currently playing. Not Copying.
+   FailExit
+fi
+
+mountpoint "$PLEXDBLOC"
+
+if [ "$?" != "0" ]; then
+   LogWarning "$PLEXDBLOC is not a mountpoint.  Nothing to stop."
+   FailExit
+fi
+
+stop_docker $DOCKER_NAME 60
+sleep 15
+umount "$PLEXDBLOC"
+
+mountpoint "$PLEXDBLOC"
+
+
+if [ "$?" == "0" ]; then
+   LogError "$PLEXDBLOC is still a  mountpoint after unmounting. Something went wrong."
+   FailExit
+fi
+
+ValidateDir $RAMDISKDIR
+if [ "$?" != "0" ]; then
+   LogError At least 1 DB is Corrupt
+   FailExit
+fi
+
+rsync -c -a --progress -h --exclude THIS_IS_A_RAMDISK --exclude '*.db-20*' "$RAMDISKDIR/" "$PLEXDBLOC/"
+
+Start
+
+}
+
 
 
 function ValidateDb() {
@@ -300,7 +365,7 @@ return $error
 
 }
 
-TEMP=`getopt -o h --long start,stop,estop,validate:,help  -n 'plex-ramdisk' -- "$@"`
+TEMP=`getopt -o h --long start,stop,estop,validate:,copyback,help  -n 'plex-ramdisk' -- "$@"`
 
 if [ $? != 0 ] ; then Help ; fi
 
@@ -308,6 +373,7 @@ eval set -- "$TEMP"
 START=0
 STOP=0
 ESTOP=0
+COPYBACK=0
 VALIDATE=""
 while true ; do
     case "$1" in
@@ -327,6 +393,10 @@ while true ; do
             VALIDATE="$2"
             shift 2
             ;;
+        "--copyback")
+            COPYBACK=1
+            shift
+            ;;
         -h|"--help") 
             Help 
             break
@@ -335,10 +405,17 @@ while true ; do
         *) break ;;
     esac
 done
-#echo "Remaining arguments:"
-#for arg do echo '--> '"\`$arg'" ; done
+echo "Remaining arguments:"
+for arg do echo '--> '"\`$arg'" ; done
 
+
+
+if [[ "$COPYBACK" == "1" ]]; then
+   echo Starting CopyBack
+   CopyBack 
+fi
 if [[ "$VALIDATE" != "" ]]; then
+   echo Starting validate on $VALIDATE
    ValidateDir "$VALIDATE" NOCOPY 
 fi
 
