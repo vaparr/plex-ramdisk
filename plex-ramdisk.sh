@@ -192,10 +192,18 @@ fi
 
 touch "$RAMDISKDIR/THIS_IS_A_RAMDISK"
 
-if [ -f "$PLEXDBLOC/THIS_IS_A_RAMDISK" ]; then
+#if [ -f "$PLEXDBLOC/THIS_IS_A_RAMDISK" ]; then
+#   echo Ramdisk already installed. Exiting.
+#   exit
+#fi
+
+mountpoint "$PLEXDBLOC"
+
+if [ "$?" != "1" ]; then
    echo Ramdisk already installed. Exiting.
    exit
 fi
+
 
 stop_docker $DOCKER_NAME 60
 sync
@@ -282,7 +290,7 @@ if [[ "$?" == "0" ]]; then
    echo Plex is not playing
 else
    echo Plex is currently playing. Not Copying.
-   FailExit
+   exit 1
 fi
 
 mountpoint "$PLEXDBLOC"
