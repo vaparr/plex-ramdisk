@@ -71,8 +71,9 @@ function NotifyError() {
 
 function FailExit() {
 
-    umount "$PLEXDBLOC"
-    start_docker $DOCKER_NAME
+    
+    #umount "$PLEXDBLOC"
+    #start_docker $DOCKER_NAME
 
     exit 1
 }
@@ -185,30 +186,30 @@ function Start() {
     #   exit
     #fi
 
-    if ! mountpoint "$PLEXDBLOC"; then
+    if mountpoint "$PLEXDBLOC"; then
         echo Ramdisk already installed. Exiting.
         exit
     fi
 
     stop_docker $DOCKER_NAME 60
     sync
-    if rsync -c -a --progress -h --exclude '*.db-20*' --exclude Last_Known_Good "$PLEXDBLOC/" "$RAMDISKDIR/"; then
+    if ! rsync -c -a --progress -h --exclude '*.db-20*' --exclude Last_Known_Good "$PLEXDBLOC/" "$RAMDISKDIR/"; then
         LogError "rsync failed. Exiting"
         FailExit
     fi
     sync
 
-    if ValidateDir $RAMDISKDIR; then
+    if ! ValidateDir $RAMDISKDIR; then
         LogError "At least 1 DB is Corrupt"
         FailExit
     fi
 
-    if mount --bind "$RAMDISKDIR" "$PLEXDBLOC"; then
+    if ! mount --bind "$RAMDISKDIR" "$PLEXDBLOC"; then
         LogError "mount failed. Exiting"
         FailExit
     fi
 
-    if mountpoint "$PLEXDBLOC"; then
+    if ! mountpoint "$PLEXDBLOC"; then
         LogError "$PLEXDBLOC is not a mountpoint.  Something went wrong."
         FailExit
     fi
@@ -224,7 +225,7 @@ function Start() {
 }
 
 function Stop() {
-    if mountpoint "$PLEXDBLOC"; then    
+    if ! mountpoint "$PLEXDBLOC"; then    
         LogWarning "$PLEXDBLOC is not a mountpoint.  Nothing to stop."
         FailExit
     fi
@@ -244,7 +245,7 @@ function Stop() {
         exit 0
     fi
 
-    if ValidateDir $RAMDISKDIR; then    
+    if ! ValidateDir $RAMDISKDIR; then    
         LogError At least 1 DB is Corrupt
         FailExit
     fi
@@ -257,14 +258,14 @@ function Stop() {
 
 function CopyBack() {
 
-    if IsPlexPlaying; then    
+    if ! IsPlexPlaying; then    
         echo Plex is not playing
     else
         echo Plex is currently playing. Not Copying.
         exit 1
     fi
 
-    if mountpoint "$PLEXDBLOC"; then    
+    if ! mountpoint "$PLEXDBLOC"; then    
         LogWarning "$PLEXDBLOC is not a mountpoint.  Nothing to stop."
         FailExit
     fi
@@ -278,7 +279,7 @@ function CopyBack() {
         FailExit
     fi
 
-    if ValidateDir $RAMDISKDIR; then
+    if ! ValidateDir $RAMDISKDIR; then
         LogError At least 1 DB is Corrupt
         FailExit
     fi
@@ -304,7 +305,7 @@ function Status() {
     echo
     echo -------------- RAMDISK -------------------
     echo Ramdisk Location: $RAMDISKDIR
-    if mountpoint "$PLEXDBLOC"; then
+    if ! mountpoint "$PLEXDBLOC"; then
         echo "Ramdisk is currently not mounted"
     else
         echo "Ramdisk is active:"
@@ -352,7 +353,7 @@ function ValidateDir() {
     local error=0
 
     for db in $(find "$1" -type f -name '*.db'); do
-        if ValidateDb "$db" "$2"; then        
+        if ! ValidateDb "$db" "$2"; then        
             LogError "$db: DB is Corrupt"
             error=1
         fi
