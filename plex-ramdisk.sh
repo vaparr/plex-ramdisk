@@ -25,7 +25,7 @@ function Help() {
     exit 1
 }
 
-function IsPlexPlaying() {
+function IsPlexIdle() {
 
     local sessions=$(curl -s $PLEXLOC/status/sessions?X-Plex-Token=$PLEXTOKEN | xmllint --xpath 'string(//MediaContainer/@size)' - 2>/dev/null)
     local livesessions=$(curl -s $PLEXLOC/livetv/sessions?X-Plex-Token=$PLEXTOKEN | xmllint --xpath 'string(//MediaContainer/@size)' - 2>/dev/null)
@@ -258,7 +258,7 @@ function Stop() {
 
 function CopyBack() {
 
-    if ! IsPlexPlaying; then    
+    if IsPlexIdle; then    
         echo Plex is not playing
     else
         echo Plex is currently playing. Not Copying.
@@ -301,7 +301,7 @@ function Status() {
     echo "db location: $PLEXDBLOC"
     echo
     echo --------------- PLEX ---------------------
-    IsPlexPlaying
+    IsPlexIdle
     echo
     echo -------------- RAMDISK -------------------
     echo Ramdisk Location: $RAMDISKDIR
