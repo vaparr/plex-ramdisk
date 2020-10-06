@@ -59,14 +59,14 @@ function NotifyInfo() {
     if [[ $is_user_script = 1 ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "[Plex-Ramdisk]" -s "$1" -d "$2" -i "normal"
     fi
-    echo $1 - $2
+    echo "$1 - $2"
 }
 
 function NotifyError() {
     if [[ $is_user_script = 1 ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "[Plex-Ramdisk]" -s "$1" -d "$2" -i "alert"
     fi
-    echo [ERROR] $1 - $2
+    echo "[ERROR] $1 - $2"
 }
 
 function FailExit() {
@@ -134,7 +134,6 @@ function stop_docker() {
     fi
 
     if [ "$dry_run" == "0" ]; then
-        STOPPED_DOCKER=$1
         LogInfo "$op: STOPPED docker $(docker stop -t "$2" "$1") in $((SECONDS - stop_seconds)) Seconds"
     fi
     RUNNING=$(docker container inspect -f '{{.State.Running}}' "$1")
@@ -159,9 +158,9 @@ function start_docker() {
         return
     fi
     if [ "$dry_run" == "0" ]; then
-        LogInfo "$op: STARTED docker $(docker start $1) in $((SECONDS - $start_seconds)) Seconds"
+        LogInfo "$op: STARTED docker $(docker start "$1") in $((SECONDS - start_seconds)) Seconds"
     fi
-    RUNNING=$(docker container inspect -f '{{.State.Running}}' $1)
+    RUNNING=$(docker container inspect -f '{{.State.Running}}' "$1")
     if [[ "$RUNNING" == "true" ]]; then
         LogVerbose "$op: Docker Started Successfully"
     else
@@ -225,9 +224,7 @@ function Start() {
 }
 
 function Stop() {
-    mountpoint "$PLEXDBLOC"
-
-    if [ "$?" != "0" ]; then
+    if mountpoint "$PLEXDBLOC"; then    
         LogWarning "$PLEXDBLOC is not a mountpoint.  Nothing to stop."
         FailExit
     fi
@@ -236,21 +233,18 @@ function Stop() {
     sleep 15
     umount "$PLEXDBLOC"
 
-    mountpoint "$PLEXDBLOC"
-
-    if [ "$?" == "0" ]; then
+    if mountpoint "$PLEXDBLOC"; then    
         LogError "$PLEXDBLOC is still a  mountpoint after unmounting. Something went wrong."
         FailExit
     fi
 
     if [[ "$1" == "EMERGENCY" ]]; then
-        echo Emergency Stop Completed. Please manually copy the db files in $RAMDISKDIR to $PLEXDBLOC before starting the ramdisk or the docker container again.
-        echo You can use --validate $RAMDISKDIR to validate the files are not corrupted.
+        echo "Emergency Stop Completed. Please manually copy the db files in $RAMDISKDIR to $PLEXDBLOC before starting the ramdisk or the docker container again."
+        echo "You can use --validate $RAMDISKDIR to validate the files are not corrupted."
         exit 0
     fi
 
-    ValidateDir $RAMDISKDIR
-    if [ "$?" != "0" ]; then
+    if ValidateDir $RAMDISKDIR; then    
         LogError At least 1 DB is Corrupt
         FailExit
     fi
@@ -263,18 +257,14 @@ function Stop() {
 
 function CopyBack() {
 
-    IsPlexPlaying
-
-    if [[ "$?" == "0" ]]; then
+    if IsPlexPlaying; then    
         echo Plex is not playing
     else
         echo Plex is currently playing. Not Copying.
         exit 1
     fi
 
-    mountpoint "$PLEXDBLOC"
-
-    if [ "$?" != "0" ]; then
+    if mountpoint "$PLEXDBLOC"; then    
         LogWarning "$PLEXDBLOC is not a mountpoint.  Nothing to stop."
         FailExit
     fi
@@ -283,15 +273,12 @@ function CopyBack() {
     sleep 15
     umount "$PLEXDBLOC"
 
-    mountpoint "$PLEXDBLOC"
-
-    if [ "$?" == "0" ]; then
+    if mountpoint "$PLEXDBLOC"; then    
         LogError "$PLEXDBLOC is still a  mountpoint after unmounting. Something went wrong."
         FailExit
     fi
 
-    ValidateDir $RAMDISKDIR
-    if [ "$?" != "0" ]; then
+    if ValidateDir $RAMDISKDIR; then
         LogError At least 1 DB is Corrupt
         FailExit
     fi
@@ -305,7 +292,7 @@ function CopyBack() {
 function Status() {
     echo ------------- DOCKER STATUS --------------
     echo "dockerd Service Running: $(is_dockerd_running)"
-    echo $DOCKER_NAME container: $(is_docker_running $DOCKER_NAME)
+    echo "$DOCKER_NAME container: $(is_docker_running $DOCKER_NAME)"
     echo
 
     echo ------------- DOCKER CONFIG --------------
@@ -317,8 +304,7 @@ function Status() {
     echo
     echo -------------- RAMDISK -------------------
     echo Ramdisk Location: $RAMDISKDIR
-    mountpoint "$PLEXDBLOC"
-    if [ "$?" != "0" ]; then
+    if mountpoint "$PLEXDBLOC"; then
         echo "Ramdisk is currently not mounted"
     else
         echo "Ramdisk is active:"
@@ -333,7 +319,7 @@ function Status() {
 
 function ValidateDb() {
     sync
-    echo -n Checking DB $1 ...
+    echo -n "Checking DB $1 ..."
     #echo cp "$1" "$1.old"
     cp "$1" "$1.old"
     sqlite3 "$1.old" "DROP index 'index_title_sort_naturalsort'" >/dev/null 2>&1
@@ -367,7 +353,7 @@ function ValidateDir() {
 
     for db in $(find "$1" -type f -name '*.db'); do
         if ValidateDb "$db" "$2"; then        
-            LogError $db: DB is Corrupt
+            LogError "$db: DB is Corrupt"
             error=1
         fi
     done
