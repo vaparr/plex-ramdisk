@@ -352,7 +352,7 @@ function ValidateDir() {
 
     local error=0
 
-    for db in $(find "$1" -type f -name '*.db'); do
+    for db in "$1"/*.db; do
         if ! ValidateDb "$db" "$2"; then        
             LogError "$db: DB is Corrupt"
             error=1
